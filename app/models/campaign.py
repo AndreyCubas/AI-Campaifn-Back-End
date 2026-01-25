@@ -29,4 +29,4 @@ class Campaign(Base):
     category = relationship("Category")
     donations = relationship("Donation", back_populates="campaign")
     updates = relationship("Update", back_populates="campaign")
-    creator = relationship("User", back_populates="campaigns")
+    creator = relationship("User", foreign_keys=[user_id], overlaps="user")

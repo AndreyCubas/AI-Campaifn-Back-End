@@ -2,13 +2,13 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.core.database import engine, Base, get_db
-from app.core.security import get_current_user, verify_password, get_password_hash 
+from app.core.security import get_current_user, verify_password, get_password_hash, create_access_token
 from app.schemas.user import UserCreate, Token  
 from app.models import *  
 from app.models import User as UserModel
 
 
-app = FastAPI(title="Crowdfunding API 🚀")
+app = FastAPI(title="AI-Campaign-Back-End API 🚀")
 Base.metadata.create_all(bind=engine)
 
 @app.get("/")
@@ -88,42 +88,54 @@ async def get_featured(db: Session = Depends(get_db)):
     return campaigns
 
 
-
 # REGISTER
 @app.post("/auth/register", response_model=dict)
 async def register(user_data: UserCreate, db: Session = Depends(get_db)):
-    # Verifica se usuário já existe
-    existing_user = db.query(UserModel).filter(UserModel.email == user_data.email).first()
-    if existing_user:
-        return {"error": "Email já cadastrado"}
-    
-    # Cria usuário criptografado
-    hashed_password = get_password_hash(user_data.password)
-    db_user = UserModel(
-        email=user_data.email,
-        name=user_data.name,
-        password=hashed_password,  # Campo password no model
-        is_active=True
-    )
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return {"message": "Usuário criado!", "user_id": db_user.id}
+    try:
+        existing_user = db.query(UserModel).filter(UserModel.email == user_data.email).first()
+        if existing_user:
+            return {"error": "Email já cadastrado"}
+        
+
+        safe_password = user_data.password[:72] if len(user_data.password) > 72 else user_data.password
+        hashed_password = get_password_hash(safe_password)
+        
+        db_user = UserModel(
+            email=user_data.email,
+            name=user_data.name,
+            password=hashed_password,
+            is_active=True
+        )
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+        return {"message": "✅ Usuário criado!", "user_id": db_user.id}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 
 # LOGIN
+
 @app.post("/auth/login", response_model=Token)
 async def login(form_data: dict, db: Session = Depends(get_db)):
     user = db.query(UserModel).filter(UserModel.email == form_data["email"]).first()
-    if not user or not verify_password(form_data["password"], user.password):
-        raise HTTPException(status_code=401, detail="Credenciais inválidas")
+    if not user:
+        raise HTTPException(status_code=401, detail="❌ Credenciais inválidas")
+
+    safe_password = form_data["password"][:72]
+    if not verify_password(safe_password, user.password):
+        raise HTTPException(status_code=401, detail="❌ Credenciais inválidas")
     
     access_token = create_access_token(data={"sub": str(user.id)})
     return {"access_token": access_token, "token_type": "bearer"}
 
-# PERFIL (PROTEGIDO)
+
+# PERFIL
 @app.get("/users/me")
 async def read_users_me(current_user_id: str = Depends(get_current_user), db: Session = Depends(get_db)):
     user = db.query(UserModel).filter(UserModel.id == int(current_user_id)).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
     return {"id": user.id, "email": user.email, "name": user.name}
+Base
