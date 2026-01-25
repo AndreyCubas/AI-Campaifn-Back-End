@@ -6,19 +6,28 @@ from app.core.security import get_current_user, verify_password, get_password_ha
 from app.schemas.user import UserCreate, Token  
 from app.models import *  
 from app.models import User as UserModel
+from fastapi.middleware.cors import CORSMiddleware
 
 
 app = FastAPI(title="AI-Campaign-Back-End API 🚀")
 Base.metadata.create_all(bind=engine)
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "https://seudominio.com"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 @app.get("/")
 async def root():
-    return {"message": "✅ API funcionando!"}
+    return {"message": "API funcionando!"}
 
 @app.get("/test-db")
 async def test_db(db: Session = Depends(get_db)):
     result = db.execute(text("SELECT 1")).scalar()
-    return {"status": "✅ PostgreSQL OK", "result": result}
+    return {"status": "PostgreSQL OK", "result": result}
 
 @app.get("/campaigns")
 async def get_campaigns(db: Session = Depends(get_db), skip: int = 0, limit: int = 100):
@@ -109,7 +118,7 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
         db.add(db_user)
         db.commit()
         db.refresh(db_user)
-        return {"message": "✅ Usuário criado!", "user_id": db_user.id}
+        return {"message": "Usuário criado!", "user_id": db_user.id}
     except Exception as e:
         return {"error": str(e)}
 
@@ -121,11 +130,11 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
 async def login(form_data: dict, db: Session = Depends(get_db)):
     user = db.query(UserModel).filter(UserModel.email == form_data["email"]).first()
     if not user:
-        raise HTTPException(status_code=401, detail="❌ Credenciais inválidas")
+        raise HTTPException(status_code=401, detail="Credenciais inválidas")
 
     safe_password = form_data["password"][:72]
     if not verify_password(safe_password, user.password):
-        raise HTTPException(status_code=401, detail="❌ Credenciais inválidas")
+        raise HTTPException(status_code=401, detail="Credenciais inválidas")
     
     access_token = create_access_token(data={"sub": str(user.id)})
     return {"access_token": access_token, "token_type": "bearer"}
@@ -138,4 +147,31 @@ async def read_users_me(current_user_id: str = Depends(get_current_user), db: Se
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
     return {"id": user.id, "email": user.email, "name": user.name}
-Base
+
+# PAGINAÇÃO + FILTROS
+@app.get("/campaigns")
+async def get_campaigns(
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 100,
+    status: str = None,
+    category_id: int = None
+):
+    query = db.query(Campaign)
+    if status:
+        query = query.filter(Campaign.status == status)
+    if category_id:
+        query = query.filter(Campaign.category_id == category_id)
+    return query.offset(skip).limit(limit).all()
+
+# HEALTH CHECK
+@app.get("/health")
+async def health():
+    return {"status": "OK", "version": "1.0.0"}
+
+# STATS
+@app.get("/stats")
+async def get_stats(db: Session = Depends(get_db)):
+    total_campaigns = db.query(Campaign).count()
+    active_campaigns = db.query(Campaign).filter(Campaign.status == "active").count()
+    return {"total": total_campaigns, "active": active_campaigns}
