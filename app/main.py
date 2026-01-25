@@ -7,8 +7,15 @@ from app.schemas.user import UserCreate, Token
 from app.models import *  
 from app.models import User as UserModel
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.testclient import TestClient
+from app.main import app
 
+client = TestClient(app)
 
+def test_root():
+    response = client.get("/")
+    assert response.status_code == 200
+    
 app = FastAPI(title="AI-Campaign-Back-End API 🚀")
 Base.metadata.create_all(bind=engine)
 
