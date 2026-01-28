@@ -10,7 +10,8 @@ def get_campaigns(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Campaign).offset(skip).limit(limit).all()
 
 def create_campaign(db: Session, campaign: schemas.CampaignCreate):
-    db_campaign = models.Campaign(**campaign.dict())
+    # Pydantic v2
+    db_campaign = models.Campaign(**campaign.model_dump())
     db.add(db_campaign)
     db.commit()
     db.refresh(db_campaign)

@@ -6,7 +6,7 @@ from decimal import Decimal
 # Para CREATE (sem ID)
 class CampaignCreate(BaseModel):
     title: str = Field(..., min_length=3, max_length=255)
-    slug: str = Field(..., min_length=3, max_length=255)
+    slug: Optional[str] = Field(None, min_length=3, max_length=255)
     description: Optional[str] = None
     story: Optional[str] = None
     goal_amount: Decimal
@@ -24,7 +24,8 @@ class CampaignResponse(BaseModel):
     story: Optional[str]
     cover_image: Optional[str]
     goal_amount: Decimal
-    current_amount: Decimal
+    # Não existe coluna "current_amount" em Campaign; default evita erro no response_model.
+    current_amount: Decimal = Decimal("0")
     user_id: int
     category_id: Optional[int]
     is_urgent: bool = False
